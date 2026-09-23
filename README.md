@@ -99,7 +99,7 @@ compiler can catch, because a declaration file is authoritative by
 construction.
 
 ```ts
-import { loadCorpus, runnableCases, ask, report } from '@flashyos/conformance-kit'
+import { loadCorpus, runnableCases, judge, SET_KINDS } from '@flashyos/conformance-kit'
 ```
 
 ## What conformance-kit is not

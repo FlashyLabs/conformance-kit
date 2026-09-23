@@ -51,17 +51,77 @@ export async function loadCorpus(where, { fetchImpl = fetch } = {}) {
   return JSON.parse(readFileSync(where, 'utf8'))
 }
 
+/**
+ * Set kinds a runner can put a question to, and what the answer must carry.
+ *
+ * `validate` asks whether a document is acceptable, and the answer is a
+ * boolean. `decide` asks which of a closed, DECLARED set of outcomes applies,
+ * and the answer is one of them.
+ *
+ * ── Why `decide` exists ────────────────────────────────────────────────────
+ *
+ * `policy-guard/1` grades a spend as ALLOW, ESCALATE or DENY. Folded into a
+ * boolean, ALLOW and ESCALATE become the same answer — and the difference
+ * between them is a human being asked before a signature happens, which is the
+ * entire point of the profile. A corpus that cannot express "this must
+ * escalate, not allow" is a corpus that cannot check the thing worth checking.
+ *
+ * The alternative on offer was `opaque`: carried in the corpus' own shape, and
+ * readable only with the package that owns the profile. That is a corpus a
+ * stranger cannot run, which defeats the reason corpora are published at all.
+ *
+ * The vocabulary travels IN the bundle, as `set.outcomes`. An implementer needs
+ * nothing from us to know what answers are legal.
+ */
+export const SET_KINDS = Object.freeze(['validate', 'decide'])
+
+/** The set kinds this runner understands, since 0.2.0. */
+export const DECIDE_SETS_SINCE = '0.2.0'
+
 /** Every case a runner can actually put a question to. */
 export function runnableCases(corpus) {
   const cases = []
   const skipped = []
   for (const set of corpus?.sets ?? []) {
-    if (set.kind !== 'validate') {
+    if (!SET_KINDS.includes(set.kind)) {
       skipped.push({ set: set.name, cases: set.cases?.length ?? 0, why: set.about ?? 'not an accept/refuse set' })
       continue
     }
-    for (const c of set.cases) cases.push({ ...c, set: set.name })
+    // A `decide` set that names no vocabulary is refused rather than guessed
+    // at: without it an implementer cannot know which answers are legal, and a
+    // runner comparing free strings would call a typo a disagreement.
+    if (set.kind === 'decide' && !Array.isArray(set.outcomes)) {
+      skipped.push({ set: set.name, cases: set.cases?.length ?? 0, why: 'a decide set must declare its `outcomes` vocabulary' })
+      continue
+    }
+    for (const c of set.cases) cases.push({ ...c, set: set.name, kind: set.kind, outcomes: set.outcomes })
   }
+
+  // ── Ids are unique across the BUNDLE, not within a set ───────────────────
+  //
+  // Answers come back keyed by id alone, because the protocol's whole appeal
+  // is that an implementation echoes an id and nothing else. Two cases sharing
+  // one id therefore means the second answer silently overwrites the first,
+  // and the first case is then judged against an answer to a different
+  // question — reported as `unreadable`, which sends the reader looking for a
+  // bug in their program that is not there.
+  //
+  // Found by the first corpus to carry two set kinds: `records/not-an-object`
+  // and `envelope-shape/not-an-object` were both reasonable names inside their
+  // own set. Refused here rather than deduplicated, because a corpus with two
+  // cases under one id has a defect the author needs to fix, and picking one
+  // silently is how a runner reports a clean pass over a broken corpus.
+  const seen = new Map()
+  const duplicates = []
+  for (const c of cases) {
+    if (seen.has(c.id)) duplicates.push({ id: c.id, sets: [seen.get(c.id), c.set] })
+    else seen.set(c.id, c.set)
+  }
+  if (duplicates.length) {
+    const named = duplicates.map((d) => `${d.id} (${d.sets.join(', ')})`).join('; ')
+    throw new Error(`corpus has ${duplicates.length} duplicate case id(s), which would make answers overwrite each other: ${named}`)
+  }
+
   return { cases, skipped }
 }
 
@@ -72,11 +132,35 @@ export function runnableCases(corpus) {
  * language has to get right, and because its rules are easier to check than to
  * describe.
  */
-export function judge(expected, answer) {
+export function judge(expected, answer, { outcomes } = {}) {
   if (answer === undefined) return { state: 'unanswered' }
+
+  // A `decide` expectation names a verdict; a `validate` one names a boolean.
+  // The expectation decides which question was asked, never the answer — an
+  // implementation that replies with the wrong shape is UNREADABLE, which is a
+  // different finding from replying with the wrong answer.
+  if (typeof expected?.verdict === 'string') {
+    if (typeof answer?.verdict !== 'string') return { state: 'unreadable', got: answer }
+    if (Array.isArray(outcomes) && !outcomes.includes(answer.verdict))
+      return { state: 'unreadable', got: answer, why: `${answer.verdict} is not one of ${outcomes.join(', ')}` }
+    if (answer.verdict !== expected.verdict)
+      return { state: 'disagreed', why: `expected ${expected.verdict}, got ${answer.verdict}` }
+    return codesAgree(expected, answer)
+  }
+
   if (typeof answer?.valid !== 'boolean') return { state: 'unreadable', got: answer }
   if (answer.valid !== expected.valid)
     return { state: 'disagreed', why: `expected valid=${expected.valid}, got valid=${answer.valid}` }
+  return codesAgree(expected, answer)
+}
+
+/**
+ * Codes are compared only where the case states them, and extra codes pass.
+ *
+ * Policing the full set would fail every implementation that reports one more
+ * thing than ours does, which is advice dressed as a conformance failure.
+ */
+function codesAgree(expected, answer) {
   if (Array.isArray(expected.codes)) {
     const got = Array.isArray(answer.codes) ? answer.codes : []
     const missing = expected.codes.filter((c) => !got.includes(c))
@@ -136,7 +220,7 @@ export async function ask(cases, command, args, { timeoutMs = 60000, spawnImpl =
 }
 
 export function report(cases, answers) {
-  const rows = cases.map((c) => ({ id: c.id, set: c.set, why: c.why, ...judge(c.expect, answers.get(c.id)) }))
+  const rows = cases.map((c) => ({ id: c.id, set: c.set, why: c.why, ...judge(c.expect, answers.get(c.id), { outcomes: c.outcomes }) }))
   const count = (state) => rows.filter((r) => r.state === state).length
   return {
     rows,

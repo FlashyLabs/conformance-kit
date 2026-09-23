@@ -17,9 +17,19 @@ export interface Case {
   expect?: Expectation
 }
 
+/**
+ * What a case expects.
+ *
+ * A `validate` set states `valid`; a `decide` set states `verdict`. The
+ * expectation decides which question was asked — an implementation replying
+ * with the wrong shape is `unreadable`, which is a different finding from
+ * replying with the wrong answer.
+ */
 export interface Expectation {
   /** `true` means no ERRORS. A document drawing only warnings is valid. */
-  valid: boolean
+  valid?: boolean
+  /** One of the set's declared `outcomes`, for a `decide` set. */
+  verdict?: string
   /** Compared only when the case states them; extra codes are allowed. */
   codes?: string[]
 }
@@ -27,9 +37,25 @@ export interface Expectation {
 /** One line back from the implementation under test. */
 export interface Answer {
   id: string
-  valid: boolean
+  /** For a `validate` case. */
+  valid?: boolean
+  /** For a `decide` case: one of the set's declared `outcomes`. */
+  verdict?: string
   codes?: string[]
 }
+
+/**
+ * The set kinds a runner can put a question to.
+ *
+ * `validate` asks whether a document is acceptable. `decide` asks which of a
+ * closed, DECLARED vocabulary of outcomes applies — for profiles whose answer
+ * is not a boolean, such as `policy-guard/1`, where ALLOW and ESCALATE differ
+ * by whether a human is asked before a signature happens.
+ */
+export declare const SET_KINDS: readonly ['validate', 'decide']
+
+/** The version in which `decide` sets became runnable. */
+export declare const DECIDE_SETS_SINCE: string
 
 /**
  * Four outcomes, never two, and never folded into one score.
@@ -39,11 +65,20 @@ export interface Answer {
  */
 export type Verdict = 'agreed' | 'disagreed' | 'unanswered' | 'unreadable'
 
+export interface CorpusSet {
+  name: string
+  kind: 'validate' | 'decide' | string
+  /** Required on a `decide` set; a set without it is skipped, never guessed. */
+  outcomes?: string[]
+  about?: string
+  cases: Case[]
+}
+
 export interface Corpus {
   contract: string
   profile: string
   version?: string
-  sets: { id?: string; mode?: string; cases: Case[] }[]
+  sets: CorpusSet[]
   [key: string]: unknown
 }
 
@@ -70,7 +105,11 @@ export declare function loadCorpus(where: string, opts?: { fetchImpl?: typeof fe
 /** The cases that carry an expectation, which are the only runnable ones. */
 export declare function runnableCases(corpus: Corpus): Case[]
 
-export declare function judge(expected: Expectation | undefined, answer: Answer | undefined): { state: Verdict; detail?: string }
+export declare function judge(
+  expected: Expectation | undefined,
+  answer: Answer | undefined,
+  opts?: { outcomes?: string[] },
+): { state: Verdict; detail?: string; why?: string }
 
 /**
  * Spawn the command ONCE and stream every case to it.

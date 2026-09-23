@@ -164,3 +164,105 @@ describe('the corpus and the reference implementation agree', () => {
     },
   )
 })
+
+describe('a decide set: three verdicts, not a boolean', () => {
+  // `policy-guard/1` grades a spend ALLOW, ESCALATE or DENY. Folded into a
+  // boolean, ALLOW and ESCALATE collapse — and the difference between them is
+  // a human being asked before a signature happens, which is the profile's
+  // entire subject. The alternative the bundle format offered was `opaque`:
+  // readable only with the package that owns the profile, which is a corpus a
+  // stranger cannot run.
+
+  const set = {
+    name: 'envelopes',
+    kind: 'decide',
+    outcomes: ['ALLOW', 'ESCALATE', 'DENY'],
+    cases: [
+      { id: 'under-ceiling', input: {}, expect: { verdict: 'ALLOW' } },
+      { id: 'over-ceiling', input: {}, expect: { verdict: 'ESCALATE' } },
+      { id: 'over-cap', input: {}, expect: { verdict: 'DENY', codes: ['PER_TX_CAP'] } },
+    ],
+  }
+
+  test('its cases are runnable, and carry the vocabulary with them', () => {
+    const { cases, skipped } = runnableCases({ sets: [set] })
+    assert.equal(cases.length, 3)
+    assert.equal(skipped.length, 0)
+    // The vocabulary travels with the case: an implementer needs nothing from
+    // us to know which answers are legal.
+    assert.deepEqual(cases[0].outcomes, ['ALLOW', 'ESCALATE', 'DENY'])
+  })
+
+  test('a decide set with no declared vocabulary is refused, never guessed', () => {
+    const { cases, skipped } = runnableCases({ sets: [{ ...set, outcomes: undefined }] })
+    assert.equal(cases.length, 0)
+    assert.match(skipped[0].why, /outcomes/)
+  })
+
+  test('the verdict is compared, and ALLOW never passes for ESCALATE', () => {
+    assert.equal(judge({ verdict: 'ESCALATE' }, { id: 'x', verdict: 'ESCALATE' }).state, 'agreed')
+    // The case this whole set kind exists for.
+    assert.equal(judge({ verdict: 'ESCALATE' }, { id: 'x', verdict: 'ALLOW' }).state, 'disagreed')
+  })
+
+  test('an answer outside the declared vocabulary is unreadable, not disagreed', () => {
+    // A different finding: a program answering `MAYBE` has not judged the case
+    // wrongly, it has failed to speak the protocol — and `unreadable` enters
+    // no ratio while `disagreed` does.
+    const r = judge({ verdict: 'ALLOW' }, { id: 'x', verdict: 'MAYBE' }, { outcomes: ['ALLOW', 'ESCALATE', 'DENY'] })
+    assert.equal(r.state, 'unreadable')
+  })
+
+  test('answering a decide case with a boolean is unreadable', () => {
+    assert.equal(judge({ verdict: 'DENY' }, { id: 'x', valid: false }).state, 'unreadable')
+  })
+
+  test('the denial code is compared where the case states one', () => {
+    assert.equal(judge({ verdict: 'DENY', codes: ['PER_TX_CAP'] }, { id: 'x', verdict: 'DENY', codes: ['PER_TX_CAP'] }).state, 'agreed')
+    assert.equal(judge({ verdict: 'DENY', codes: ['PER_TX_CAP'] }, { id: 'x', verdict: 'DENY', codes: ['DAILY_CAP'] }).state, 'disagreed')
+    // Extra codes pass: policing the full set fails every implementation that
+    // reports one more thing than ours does.
+    assert.equal(judge({ verdict: 'DENY', codes: ['PER_TX_CAP'] }, { id: 'x', verdict: 'DENY', codes: ['PER_TX_CAP', 'EXTRA'] }).state, 'agreed')
+  })
+
+  test('a validate corpus is judged exactly as before', () => {
+    // The addition must not reach the corpora already published against it.
+    assert.equal(judge({ valid: true }, { id: 'x', valid: true }).state, 'agreed')
+    assert.equal(judge({ valid: false, codes: ['no-rung-zero'] }, { id: 'x', valid: false, codes: ['no-rung-zero'] }).state, 'agreed')
+    assert.equal(judge({ valid: false }, { id: 'x', valid: true }).state, 'disagreed')
+    assert.equal(judge({ valid: true }, { id: 'x', verdict: 'ALLOW' }).state, 'unreadable')
+  })
+})
+
+describe('a corpus whose ids collide is refused, not deduplicated', () => {
+  // Answers come back keyed by id alone. Two cases sharing one id means the
+  // second answer overwrites the first, and the first is judged against an
+  // answer to a different question — surfacing as `unreadable`, which sends
+  // the reader hunting a bug in their own program that is not there.
+  //
+  // Found by the first corpus carrying two set kinds: `records/not-an-object`
+  // and `envelope-shape/not-an-object`, each a reasonable name inside its own
+  // set.
+
+  const corpus = {
+    sets: [
+      { name: 'records', kind: 'decide', outcomes: ['ALLOW', 'DENY'], cases: [{ id: 'not-an-object', input: 1, expect: { verdict: 'DENY' } }] },
+      { name: 'shape', kind: 'validate', cases: [{ id: 'not-an-object', input: 1, expect: { valid: false } }] },
+    ],
+  }
+
+  test('it throws, and names both sets', () => {
+    assert.throws(() => runnableCases(corpus), /duplicate case id/)
+    assert.throws(() => runnableCases(corpus), /records, shape/)
+  })
+
+  test('the same id inside one set is caught too', () => {
+    const one = { sets: [{ name: 'a', kind: 'validate', cases: [{ id: 'x', expect: { valid: true } }, { id: 'x', expect: { valid: false } }] }] }
+    assert.throws(() => runnableCases(one), /duplicate case id/)
+  })
+
+  test('distinct ids pass, so the guard is not simply always throwing', () => {
+    const ok = { sets: [{ name: 'a', kind: 'validate', cases: [{ id: 'x', expect: { valid: true } }, { id: 'y', expect: { valid: false } }] }] }
+    assert.equal(runnableCases(ok).cases.length, 2)
+  })
+})
