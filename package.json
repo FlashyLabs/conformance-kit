@@ -1,0 +1,31 @@
+{
+  "name": "@flashyos/conformance-kit",
+  "version": "0.0.0",
+  "description": "Run a conformance corpus against any executable, in any language.",
+  "license": "Apache-2.0",
+  "author": "Flashy Labs",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flashylabs/conformance-kit.git"
+  },
+  "homepage": "https://github.com/flashylabs/conformance-kit#readme",
+  "bugs": "https://github.com/flashylabs/conformance-kit/issues",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "conformance-kit": "./src/cli.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test src/*.test.mjs"
+  }
+}
