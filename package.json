@@ -1,6 +1,6 @@
 {
   "name": "@flashyos/conformance-kit",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Run a conformance corpus against any executable, in any language.",
   "license": "Apache-2.0",
   "author": "Flashy Labs",
@@ -14,11 +14,26 @@
   "engines": {
     "node": ">=20"
   },
+  "keywords": [
+    "conformance",
+    "conformance-testing",
+    "interoperability",
+    "specification",
+    "test-harness",
+    "protocol",
+    "standards",
+    "cli",
+    "zero-dependencies"
+  ],
   "bin": {
     "conformance-kit": "./src/cli.mjs"
   },
+  "types": "./src/index.d.ts",
   "exports": {
-    ".": "./src/index.mjs"
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
+    }
   },
   "files": [
     "src",

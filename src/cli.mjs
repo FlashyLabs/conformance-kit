@@ -157,7 +157,9 @@ if (RUN) {
       '\n  conformance-kit <corpus-url-or-path> -- <command> [args...]\n\n' +
         '  The command reads one JSON object per line on stdin and writes one\n' +
         '  per line on stdout: { id, valid, codes? }.\n\n' +
-        '  e.g. conformance-kit https://flashyos.com/.well-known/conformance/frontdoor-1.json -- ./my-validator\n\n',
+        '  The corpus is a path or a URL. A path needs no network, and the\n' +
+        '  examples directory ships one:\n\n' +
+        '  e.g. conformance-kit examples/frontdoor-1.json -- ./my-validator\n\n',
     )
     process.exit(2)
   }

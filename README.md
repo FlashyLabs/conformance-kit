@@ -9,16 +9,29 @@
       ██
 ```
 
+[![CI](https://github.com/flashylabs/conformance-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/flashylabs/conformance-kit/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/licence-Apache--2.0-blue)](LICENSE)
+
 **Run a conformance corpus against any executable, in any language.**
 
 A specification is only implementable by a stranger if its corpus is runnable by one. This takes a corpus and a command, streams every case to that command on stdin, and diffs the verdicts — so proving a Rust or Python implementation agrees is an afternoon rather than a week of reading somebody else’s test suite.
 
 ## Using it
 
+A corpus ships in this repository, so the first run needs no network
+and no implementation of yours:
+
 ```bash
-npx @flashyos/conformance-kit \
-  https://flashyos.com/.well-known/conformance/frontdoor-1.json \
-  -- ./my-validator
+git clone https://github.com/flashylabs/conformance-kit && cd conformance-kit
+npx @flashyos/conformance-kit examples/frontdoor-1.json -- node examples/always-valid.mjs
+```
+
+`always-valid.mjs` calls every document valid. It agrees on every case the
+corpus accepts and disagrees on every one it refuses — which is the shortest
+demonstration of why the refusals are the interesting half. Then point it at
+your own program:
+
+```bash
+npx @flashyos/conformance-kit examples/frontdoor-1.json -- ./my-validator
 ```
 
 Your program reads one JSON object per line and writes one per line. That is
@@ -72,7 +85,22 @@ convenience at a time.
 No account, no API key, no telemetry, and no network call unless you ask
 for one. If anything here ever needs a service of ours to answer, that is a
 bug — you would be right to refuse a checker with a dependency on the party
-being checked.
+being checked. That applies to the documentation too: every command in this
+file runs against a file in this repository, because a README whose first
+line fetches from our domain is one that stops working when we do.
+
+## Types
+
+Shipped, and checked against the module rather than against somebody’s
+memory of it. `src/types.test.mjs` imports the real barrel and fails if a
+declaration names an export that does not exist, or if an export has no
+declaration — the two directions a `.d.ts` rots in, neither of which a
+compiler can catch, because a declaration file is authoritative by
+construction.
+
+```ts
+import { loadCorpus, runnableCases, ask, report } from '@flashyos/conformance-kit'
+```
 
 ## What conformance-kit is not
 
@@ -143,8 +171,7 @@ tooling is open; fork either, and check ours against yours.
 
 ## The formats these were written for
 
-Published, machine-readable, and implementable without installing anything:
-
-```bash
-curl -s https://flashyos.com/.well-known/specs.json | jq .
-```
+`directory/1`, `frontdoor/1`, `countersign/1`, `backlog/1`, `shipped/1` and the
+rest are Apache-2.0 and specified in the open at
+[github.com/flashylabs](https://github.com/flashylabs). Nothing in them requires
+an account, a key, or a call to us — including the checking.
