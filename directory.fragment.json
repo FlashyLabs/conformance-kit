@@ -1,0 +1,80 @@
+{
+  "contract": "directory/1",
+  "generated": "2026-09-29",
+  "org": "org/conformance-kit",
+  "nodes": [
+    {
+      "id": "org/conformance-kit",
+      "kind": "org",
+      "name": "Conformance Kit"
+    },
+    {
+      "id": "person/michael",
+      "kind": "person",
+      "name": "Michael Gord"
+    },
+    {
+      "id": "agent/conformance-kit-maintainer",
+      "kind": "agent",
+      "name": "maintainer",
+      "for": "org/conformance-kit"
+    },
+    {
+      "id": "agent/conformance-kit-review",
+      "kind": "agent",
+      "name": "review",
+      "for": "org/conformance-kit"
+    },
+    {
+      "id": "agent/conformance-kit-release",
+      "kind": "agent",
+      "name": "release",
+      "for": "org/conformance-kit"
+    },
+    {
+      "id": "agent/conformance-kit-conformance",
+      "kind": "agent",
+      "name": "conformance",
+      "for": "org/conformance-kit"
+    },
+    {
+      "id": "agent/conformance-kit-operations",
+      "kind": "agent",
+      "name": "operations",
+      "for": "org/conformance-kit"
+    }
+  ],
+  "edges": [
+    {
+      "from": "org/conformance-kit",
+      "rel": "staffs",
+      "to": "agent/conformance-kit-maintainer",
+      "by": "person/michael"
+    },
+    {
+      "from": "org/conformance-kit",
+      "rel": "staffs",
+      "to": "agent/conformance-kit-review",
+      "by": "person/michael"
+    },
+    {
+      "from": "org/conformance-kit",
+      "rel": "staffs",
+      "to": "agent/conformance-kit-release",
+      "by": "person/michael"
+    },
+    {
+      "from": "org/conformance-kit",
+      "rel": "staffs",
+      "to": "agent/conformance-kit-conformance",
+      "by": "person/michael"
+    },
+    {
+      "from": "org/conformance-kit",
+      "rel": "staffs",
+      "to": "agent/conformance-kit-operations",
+      "by": "person/michael"
+    }
+  ],
+  "x-note": "Five agents, one per charter role. Generated from flashyos.roles.json; a live org is provisioned from the charter with provision-org-from-charter."
+}
