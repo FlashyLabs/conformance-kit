@@ -1,0 +1,58 @@
+{
+  "contract": "conformance/1",
+  "profile": "policy-guard/1",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "about": "A decide corpus, not a validate one. policy-guard/1 grades a spend as ALLOW, ESCALATE or DENY. Folded into a boolean, ALLOW and ESCALATE become one answer — and the difference between them is a human being asked before a signature happens, which is the entire point of the profile. So the answer is a verdict from a closed, declared vocabulary, and this corpus asserts which one each spend must draw.",
+  "protocol": {
+    "in": "{ \"id\": \"…\", \"set\": \"envelopes\", \"input\": { \"amount\": 0, \"escalateAbove\": 0, \"perTxCap\": 0 } }",
+    "out": "{ \"id\": \"…\", \"verdict\": \"ALLOW|ESCALATE|DENY\", \"codes\": [\"…\"]? }",
+    "note": "The verdict must be one of the set's declared `outcomes`. A reply outside that vocabulary is UNREADABLE — the program failed to speak the protocol — which is a different finding from answering the wrong verdict."
+  },
+  "sets": [
+    {
+      "name": "envelopes",
+      "kind": "decide",
+      "outcomes": ["ALLOW", "ESCALATE", "DENY"],
+      "about": "A spend is ALLOWed under the escalation ceiling, ESCALATEd above it (a human is asked), and DENIED above the per-transaction cap (no human can wave it through).",
+      "cases": [
+        {
+          "id": "well-under-ceiling",
+          "why": "A routine spend far below the ceiling clears without anyone being asked.",
+          "input": { "amount": 100, "escalateAbove": 1000, "perTxCap": 10000 },
+          "expect": { "verdict": "ALLOW" }
+        },
+        {
+          "id": "exactly-at-ceiling",
+          "why": "The ceiling is the last ALLOW, not the first ESCALATE: escalation is for spends ABOVE it.",
+          "input": { "amount": 1000, "escalateAbove": 1000, "perTxCap": 10000 },
+          "expect": { "verdict": "ALLOW" }
+        },
+        {
+          "id": "just-over-ceiling",
+          "why": "One unit over the ceiling asks a human. This is the case the whole profile exists for — a boolean would have called it ALLOW.",
+          "input": { "amount": 1001, "escalateAbove": 1000, "perTxCap": 10000 },
+          "expect": { "verdict": "ESCALATE" }
+        },
+        {
+          "id": "well-over-ceiling-under-cap",
+          "why": "A large but not impossible spend escalates; it is not denied, because a human may still approve it.",
+          "input": { "amount": 5000, "escalateAbove": 1000, "perTxCap": 10000 },
+          "expect": { "verdict": "ESCALATE" }
+        },
+        {
+          "id": "exactly-at-cap",
+          "why": "The cap is the last ESCALATE, not the first DENY: the hard refusal is for spends ABOVE it.",
+          "input": { "amount": 10000, "escalateAbove": 1000, "perTxCap": 10000 },
+          "expect": { "verdict": "ESCALATE" }
+        },
+        {
+          "id": "over-cap",
+          "why": "Above the per-transaction cap, no signature is offered — a DENY, and the code names why.",
+          "input": { "amount": 10001, "escalateAbove": 1000, "perTxCap": 10000 },
+          "expect": { "verdict": "DENY", "codes": ["PER_TX_CAP"] }
+        }
+      ]
+    }
+  ]
+}

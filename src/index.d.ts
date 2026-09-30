@@ -126,3 +126,13 @@ export declare function ask(
 ): Promise<{ answers: Map<string, Answer>; extra: string[] }>
 
 export declare function report(cases: Case[], answers: Map<string, Answer>): Report
+
+/**
+ * The command-line driver.
+ *
+ * `src/cli.mjs` (the `bin`) is a two-line wrapper over this, so the command
+ * users run cannot drift from the runner it drives. Takes `argv` sliced past
+ * `node <script>` and returns the process exit code rather than calling
+ * `process.exit`, so a caller can run it and read the outcome.
+ */
+export declare function runCli(argv: string[]): Promise<number>

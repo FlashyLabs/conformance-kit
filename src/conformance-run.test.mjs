@@ -165,6 +165,44 @@ describe('the corpus and the reference implementation agree', () => {
   )
 })
 
+describe('a decide corpus runs end to end against a real program', () => {
+  // The `decide` counterpart to the frontdoor end-to-end test above, but on
+  // paths that exist in THIS repository rather than a monorepo — so it runs
+  // rather than skips, and is the proof that `decide` is exercised through the
+  // whole pipeline (loadCorpus → runnableCases → ask → report), not only in
+  // unit tests of `judge`. It ships as an example so a stranger can run the
+  // identical thing: `conformance-kit examples/policy-guard-1.json -- node
+  // examples/policy-guard.mjs`.
+  const CORPUS = join(ROOT, 'examples', 'policy-guard-1.json')
+  const ADAPTER = join(ROOT, 'examples', 'policy-guard.mjs')
+
+  test('the reference decide adapter agrees on every case of its own corpus', async () => {
+    const corpus = await loadCorpus(CORPUS)
+    const { cases, skipped } = runnableCases(corpus)
+    assert.equal(skipped.length, 0, 'the decide set should be runnable, not skipped')
+    assert.ok(cases.length >= 6, `only ${cases.length} cases — the example corpus is not the one expected`)
+    const { answers } = await ask(cases, process.execPath, [ADAPTER])
+    const r = report(cases, answers)
+    const failed = r.rows.filter((x) => x.state !== 'agreed').map((x) => `${x.id}: ${x.state} ${x.why ?? ''}`)
+    assert.deepEqual(failed, [], 'the decide adapter does not pass its own corpus')
+    assert.equal(r.agreed, r.total)
+  })
+
+  test('a boolean adapter against a decide corpus is unreadable, not disagreed', async () => {
+    // The distinction the four-outcome model exists for, seen through the whole
+    // pipeline: always-valid.mjs answers `{valid}`, a decide case expects a
+    // `verdict`, so every row is UNREADABLE (wrong shape) and none is
+    // `disagreed` (wrong answer). The two point at different bugs.
+    const corpus = await loadCorpus(CORPUS)
+    const { cases } = runnableCases(corpus)
+    const { answers } = await ask(cases, process.execPath, [join(ROOT, 'examples', 'always-valid.mjs')])
+    const r = report(cases, answers)
+    assert.equal(r.unreadable, r.total)
+    assert.equal(r.disagreed, 0)
+    assert.equal(r.agreed, 0)
+  })
+})
+
 describe('a decide set: three verdicts, not a boolean', () => {
   // `policy-guard/1` grades a spend ALLOW, ESCALATE or DENY. Folded into a
   // boolean, ALLOW and ESCALATE collapse — and the difference between them is

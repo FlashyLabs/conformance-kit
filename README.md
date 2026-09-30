@@ -64,6 +64,26 @@ Note `p.level == "error"`. A document that draws only **warnings** is valid,
 and an implementation that refuses one has confused advice with a rule. That
 sentence is in every corpus for a reason — see below.
 
+## Deciding, not just validating
+
+Not every profile asks a yes/no question. `policy-guard/1` grades a spend
+`ALLOW`, `ESCALATE` or `DENY`, and the gap between the first two is whether a
+human is asked before a signature happens — collapse it into a boolean and the
+profile loses the thing it exists to check. So a set can be a `decide` set: its
+cases expect a `verdict` from a closed vocabulary the bundle carries in
+`set.outcomes`, and an implementation answers one.
+
+```
+in   { "id": "over-cap", "set": "envelopes", "input": {…} }
+out  { "id": "over-cap", "verdict": "DENY", "codes": ["PER_TX_CAP"] }
+```
+
+`examples/policy-guard-1.json` and `examples/policy-guard.mjs` are a runnable
+pair. A program that answers a boolean to a `decide` corpus is reported
+**unreadable**, never *disagreed* — it has not judged the case wrongly, it has
+failed to speak the protocol, and the two need different fixes. `decide` sets
+are runnable from the first release (`DECIDE_SETS_SINCE`).
+
 ## The invariants
 
 Everything here follows from these. Each is enforced by something rather

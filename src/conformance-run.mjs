@@ -75,8 +75,18 @@ export async function loadCorpus(where, { fetchImpl = fetch } = {}) {
  */
 export const SET_KINDS = Object.freeze(['validate', 'decide'])
 
-/** The set kinds this runner understands, since 0.2.0. */
-export const DECIDE_SETS_SINCE = '0.2.0'
+/**
+ * The version in which `decide` sets first became runnable.
+ *
+ * They are here from the FIRST release, not a later one: nothing has shipped
+ * yet (package.json is 0.1.0, unreleased), and `decide` is present and tested
+ * in the tree that will become that release. An earlier value of `0.2.0` was a
+ * phantom — it named a version that would follow a 0.1.0 shipped WITHOUT
+ * `decide`, and no such 0.1.0 exists. This is a floor a reader can trust: the
+ * feature is available at or after this version, and `cli.test.mjs` fails if
+ * it ever names a version this package has not reached.
+ */
+export const DECIDE_SETS_SINCE = '0.1.0'
 
 /** Every case a runner can actually put a question to. */
 export function runnableCases(corpus) {
@@ -232,9 +242,20 @@ export function report(cases, answers) {
   }
 }
 
-const RUN = import.meta.url === `file://${process.argv[1]}`
-if (RUN) {
-  const argv = process.argv.slice(2)
+/**
+ * The command-line driver, as a function.
+ *
+ * It lives here, beside the logic it drives, so the `bin` (`src/cli.mjs`)
+ * can be a two-line wrapper that imports it. The `bin` was once a
+ * byte-for-byte COPY of this whole file, which escaped the drift test that
+ * guards its twin: the copy could rot line for line and nothing would say so.
+ * A wrapper cannot rot, because there is only one copy of the driver now.
+ *
+ * It takes `argv` (already sliced past `node <script>`) and returns the
+ * process exit code, rather than calling `process.exit` itself, so a caller —
+ * or a test — can run it and read the outcome.
+ */
+export async function runCli(argv) {
   const split = argv.indexOf('--')
   if (split === -1 || split === 0 || split === argv.length - 1) {
     process.stderr.write(
@@ -245,7 +266,7 @@ if (RUN) {
         '  examples directory ships one:\n\n' +
         '  e.g. conformance-kit examples/frontdoor-1.json -- ./my-validator\n\n',
     )
-    process.exit(2)
+    return 2
   }
 
   const corpus = await loadCorpus(argv[0])
@@ -254,7 +275,7 @@ if (RUN) {
 
   if (!cases.length) {
     process.stderr.write(`\n  ${argv[0]} holds no accept/refuse cases — nothing to run\n\n`)
-    process.exit(2)
+    return 2
   }
 
   const { answers, extra } = await ask(cases, command, args)
@@ -275,5 +296,8 @@ if (RUN) {
   if (extra.length) process.stdout.write(`    ${extra.length} non-verdict line(s) on stdout, ignored\n`)
   process.stdout.write('\n')
 
-  process.exit(r.agreed === r.total ? 0 : 1)
+  return r.agreed === r.total ? 0 : 1
 }
+
+const RUN = import.meta.url === `file://${process.argv[1]}`
+if (RUN) process.exit(await runCli(process.argv.slice(2)))
